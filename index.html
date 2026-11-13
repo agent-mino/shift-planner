@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Shifts">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#edf0ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1512" media="(prefers-color-scheme: dark)">
+<title>Work & Shift Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a rota board. One hour = one ruled cell, so the weekly cap is something you can see filling up. */
+:root{
+  --bg:#edf0ea; --surface:#fafbf7; --sunk:#e3e7df; --ink:#15211b; --muted:#5b6a61; --line:#cdd5cb;
+  --accent:#2148e8; --accent-ink:#ffffff;
+  --ok:#17804a; --warn:#a86200; --bad:#c4301c; --bad-soft:#fbe4df; --warn-soft:#fbeed3; --ok-soft:#dcf1e3;
+  --display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1512; --surface:#171f1a; --sunk:#1f2a24; --ink:#e7eee8; --muted:#93a399; --line:#2c3a32;
+    --accent:#8aa2ff; --accent-ink:#0b1020;
+    --ok:#5fcf8c; --warn:#f0b354; --bad:#ff806c; --bad-soft:#3a1c17; --warn-soft:#33270f; --ok-soft:#14301f;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1512; --surface:#171f1a; --sunk:#1f2a24; --ink:#e7eee8; --muted:#93a399; --line:#2c3a32;
+  --accent:#8aa2ff; --accent-ink:#0b1020;
+  --ok:#5fcf8c; --warn:#f0b354; --bad:#ff806c; --bad-soft:#3a1c17; --warn-soft:#33270f; --ok-soft:#14301f;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--body);-webkit-text-size-adjust:100%}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:22px;font-weight:700}
+h2{font-size:17px;font-weight:700}
+h3{font-size:14px;font-weight:700}
+p{margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top-in{max-width:1080px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:10px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand p{font-size:13px;color:var(--muted)}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav a{padding:8px 12px;text-decoration:none;color:var(--muted);font-weight:600;font-size:14px;border-bottom:3px solid transparent;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+main{max-width:1080px;margin:0 auto;padding:18px max(16px,env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));display:flex;flex-direction:column;gap:16px}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn.danger{color:var(--bad)}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:6;box-shadow:0 6px 18px rgba(0,0,0,.22);padding:12px 18px;border-radius:999px;font-size:15px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:760px){.grid,.grid.three{grid-template-columns:minmax(0,1fr)}}
+
+/* the hour strip */
+.bar{position:relative;height:22px;border:1px solid var(--line);border-radius:5px;background:var(--sunk);overflow:hidden;display:flex;
+  background-image:repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--u) - 1px),var(--line) calc(var(--u) - 1px),var(--line) var(--u))}
+.bar.big{height:46px;border-radius:7px}
+.bar .seg{display:block;height:100%}
+.seg.w{background:var(--ink)}
+.seg.b{background:var(--accent)}
+.seg.c{background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 7px);opacity:.75}
+.bar .over{position:absolute;top:0;bottom:0;background:var(--bad);mix-blend-mode:normal;opacity:.85}
+.bar .capline{position:absolute;top:0;bottom:0;width:2px;background:var(--bad)}
+.scale{display:flex;justify-content:space-between;font:12px var(--mono);color:var(--muted)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.week-hero{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center}
+@media (max-width:560px){.week-hero{grid-template-columns:1fr}}
+.bignum{font:600 44px/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.bignum small{font-size:18px;color:var(--muted);font-weight:500}
+
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;border:1px solid var(--line);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.pill.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.pill.bad{background:var(--bad-soft);color:var(--bad);border-color:transparent}
+.pill.accent{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.pill.ink{background:var(--ink);color:var(--surface);border-color:transparent}
+.pill.dash{border-style:dashed;color:var(--muted)}
+
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;border-left:4px solid;font-size:14px}
+.alert.bad{background:var(--bad-soft);border-color:var(--bad)}
+.alert.warn{background:var(--warn-soft);border-color:var(--warn)}
+.alert.ok{background:var(--ok-soft);border-color:var(--ok)}
+.alert.info{background:var(--sunk);border-color:var(--muted)}
+
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px;border-top:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.row:first-child{border-top:0}
+.row:hover{background:var(--sunk)}
+.row .when{font:500 13px var(--mono)}
+.row .what{min-width:0}
+.row .what b{display:block;overflow-wrap:anywhere}
+.row .amt{text-align:right;font:500 14px var(--mono);font-variant-numeric:tabular-nums}
+.row.cancelled .what b,.row.cancelled .amt{text-decoration:line-through;color:var(--muted)}
+.flags{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.wk-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 4px;border-bottom:2px solid var(--ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font:600 12px var(--body);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:2px solid var(--ink);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.now td{background:var(--sunk)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--surface)}
+.tile .v{font:600 24px/1.1 var(--mono);font-variant-numeric:tabular-nums;margin-top:4px}
+.tile .v.neg{color:var(--bad)} .tile .v.pos{color:var(--ok)}
+.mini{display:grid;grid-template-columns:86px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:13px;padding:5px 0}
+.mini .num{text-align:right}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;overflow-wrap:anywhere}
+a{color:var(--accent)}
+.empty{padding:18px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);text-align:center}
+.status{font-size:13px;color:var(--muted)}
+.status.err{color:var(--bad)}
+
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px)}
+dialog::backdrop{background:rgba(8,14,11,.55)}
+dialog form{display:flex;flex-direction:column;gap:14px;padding:18px}
+.fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fgrid .full{grid-column:1/-1}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
+input,select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;color:var(--ink);font-size:16px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.actions .left{margin-right:auto}
+#preview{display:flex;flex-direction:column;gap:8px}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 14px;border-radius:10px;display:flex;gap:12px;align-items:center;z-index:9;font-size:14px}
+.toast button{background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;cursor:pointer}
+ul.plain{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in">
+  <div class="brand">
+    <div><h1>Work &amp; Shift Planner</h1><p id="status" class="status">Loading your data…</p></div>
+    <button class="btn primary" data-act="add-shift" id="add-top">+ Add shift</button>
+  </div>
+  <nav id="nav" aria-label="Sections"></nav>
+</div></header>
+<main id="main"></main>
+<button class="btn primary fab" data-act="add-shift" id="fab">+ Shift</button>
+<dialog id="dlg"></dialog>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const D=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(Date.UTC(y,m-1,d))};
+const iso=d=>d.toISOString().slice(0,10);
+const addDays=(s,n)=>{const d=D(s);d.setUTCDate(d.getUTCDate()+n);return iso(d)};
+const dow=s=>(D(s).getUTCDay()+6)%7;            // 0 = Monday
+const monday=s=>addDays(s,-dow(s));
+const todayISO=()=>{const n=new Date();return n.getFullYear()+"-"+pad(n.getMonth()+1)+"-"+pad(n.getDate())};
+const mins=t=>{const[h,m]=String(t||"0:0").split(":").map(Number);return h*60+(m||0)};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const fmtD=(s,o)=>new Intl.DateTimeFormat("en-GB",Object.assign({timeZone:"UTC"},o)).format(D(s));
+const dShort=s=>fmtD(s,{weekday:"short",day:"numeric",month:"short"});
+const dDM=s=>fmtD(s,{day:"numeric",month:"short"});
+const wk=m=>dDM(m)+" – "+dDM(addDays(m,6));
+const fmtH=h=>String(Math.round(h*100)/100);
+const money=n=>(n<0?"−":"")+"£"+Math.abs(n).toFixed(2);
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const STATUS={considering:"Considering",booked:"Booked",worked:"Worked",cancelled:"Cancelled"};
+const SRC_STATUS=["To apply","Applied","Registered","Onboarding / interview","Active","Paused"];
+
+/* ---------- state ---------- */
+const LS="work-shift-planner-v1";
+const blank=()=>({v:1,settings:{cap:20,countBreaks:false},sources:[],shifts:[],classes:[],periods:[],budget:{items:[],goal:null}});
+function normalize(d){
+  const s=JSON.parse(JSON.stringify(d||{})),b=blank();
+  return {v:1,settings:Object.assign(b.settings,s.settings||{}),sources:s.sources||[],shifts:s.shifts||[],classes:s.classes||[],
+    periods:s.periods||[],budget:{items:(s.budget&&s.budget.items)||[],goal:(s.budget&&s.budget.goal)||null}};
+}
+let state=blank(), loaded=false, note="", saveErr="", view="dashboard";
+let shiftFilter="upcoming", budgetMonth=todayISO().slice(0,7), undoState=null, toastTimer=null;
+
+/* ---------- rules engine ---------- */
+const inPeriod=(d,type)=>state.periods.some(p=>p.type===type&&p.from&&p.to&&d>=p.from&&d<=p.to);
+const isVac=d=>inPeriod(d,"vacation"), isAway=d=>inPeriod(d,"away");
+function weekInfo(mon){
+  let vac=0,away=0;for(let i=0;i<7;i++){const d=addDays(mon,i);if(isVac(d))vac++;if(isAway(d))away++;}
+  const kind=vac===7?"vacation":vac>0?"mixed":"term";
+  return {mon,kind,away,cap:kind==="vacation"?null:Number(state.settings.cap)||20};
+}
+function span(s){let a=mins(s.start),b=mins(s.end);if(b<=a)b+=1440;return [a,b];}
+function segs(s){               // hours that count toward the weekly cap, split by calendar day
+  if(!s.date||!s.start||!s.end)return [];
+  const[a,b]=span(s),total=b-a,brk=Math.min(Number(s.breakMin)||0,total);
+  const net=state.settings.countBreaks?total:total-brk,k=total?net/total:0,first=Math.min(b,1440)-a,second=total-first;
+  const out=[{date:s.date,hours:first*k/60}];
+  if(second>0)out.push({date:addDays(s.date,1),hours:second*k/60});
+  return out;
+}
+const capHours=s=>segs(s).reduce((a,x)=>a+x.hours,0);
+function paidHours(s){if(!s.start||!s.end)return 0;const[a,b]=span(s);return Math.max(0,b-a-(Number(s.breakMin)||0))/60;}
+const shiftPay=s=>paidHours(s)*(Number(s.rate)||0);
+function weekTotals(shifts){
+  const m=new Map();
+  for(const s of shifts){
+    if(s.status==="cancelled")continue;
+    const sg=segs(s),th=sg.reduce((a,x)=>a+x.hours,0),pay=shiftPay(s);
+    for(const x of sg){
+      const k=monday(x.date),t=m.get(k)||{worked:0,booked:0,considering:0,total:0,pay:0};
+      t[s.status]=(t[s.status]||0)+x.hours;t.total+=x.hours;
+      if(s.status!=="considering")t.pay+=th?pay*x.hours/th:0;
+      m.set(k,t);
+    }
+  }
+  return m;
+}
+const zero=()=>({worked:0,booked:0,considering:0,total:0,pay:0});
+const absStart=s=>D(s.date)/60000+span(s)[0], absEnd=s=>D(s.date)/60000+span(s)[1];
+function classClash(s){
+  const[a,b]=span(s);
+  const parts=[[s.date,a,Math.min(b,1440)]];if(b>1440)parts.push([addDays(s.date,1),0,b-1440]);
+  for(const[d,x,y]of parts){
+    if(isVac(d))continue;
+    const c=state.classes.find(c=>Number(c.day)===dow(d)&&c.start&&c.end&&mins(c.start)<y&&mins(c.end)>x);
+    if(c)return c;
+  }
+  return null;
+}
+function shiftFlags(s,shifts,tot){
+  const f=[];if(s.status==="cancelled"||!s.date||!s.start||!s.end)return f;
+  const seen=new Set();
+  for(const x of segs(s)){
+    const k=monday(x.date),w=weekInfo(k),t=tot.get(k);
+    if(seen.has(k))continue;seen.add(k);
+    if(w.cap!=null&&t&&t.total>w.cap+1e-6){
+      const committed=t.worked+t.booked;
+      f.push({lv:committed>w.cap+1e-6?"bad":"warn",text:"Week of "+wk(k)+" would be "+fmtH(t.total)+"h, over the "+w.cap+"h cap"});
+    }
+  }
+  if(isAway(s.date))f.push({lv:"bad",text:"Falls in your time away"});
+  const c=classClash(s);if(c)f.push({lv:"bad",text:"Clashes with "+(c.title||"a class")+" ("+c.start+"–"+c.end+")"});
+  const o=shifts.find(o=>o.id!==s.id&&o.status!=="cancelled"&&o.date&&o.start&&o.end&&absStart(o)<absEnd(s)&&absEnd(o)>absStart(s));
+  if(o)f.push({lv:"warn",text:"Overlaps another shift ("+dShort(o.date)+" "+o.start+"–"+o.end+")"});
+  return f;
+}
+const srcName=id=>{const s=state.sources.find(x=>x.id===id);return s?s.name:"";};
+
+/* ---------- storage: everything stays on this device ---------- */
+const SEED={"v": 1, "settings": {"cap": 20, "countBreaks": false}, "shifts": [], "classes": [], "periods": [{"id": "p-xmas", "type": "vacation", "label": "Christmas vacation (university standard dates)", "from": "2026-12-21", "to": "2027-01-08"}, {"id": "p-easter", "type": "vacation", "label": "Easter vacation (university standard dates)", "from": "2027-03-29", "to": "2027-04-09"}], "budget": {"items": [], "goal": null}, "sources": [{"id": "s-flex", "name": "Indeed Flex", "status": "To apply", "kind": "App-based temp shifts in hospitality, retail and warehouse/industrial", "payModel": "PAYE, paid weekly. Rate is shown on each shift before you book.", "contact": "In the Indeed Flex app", "url": "https://indeedflex.co.uk/student-jobs", "next": "Finish the profile, then book the verification interview", "notes": "You choose and book shifts yourself, so you control your weekly hours. Holiday pay accrues at 12.07% of hours worked. Confirm attendance at least 24 hours before a shift."}, {"id": "s-jo", "name": "JoRecruitment", "status": "Applied", "kind": "Small Battersea agency (since 2000): catering assistants, kitchen porters, cleaners, receptionists, healthcare assistants, warehouse and events", "payModel": "Ask: PAYE or umbrella company? Weekly or monthly?", "contact": "020 7285 5010 · info@jorecruitment.co.uk · Suite 108, 248-250 York Road, SW11 3SJ", "url": "https://jorecruitment.co.uk", "next": "Ask how shifts are offered, the hourly rates, and tell them about your 20h term-time limit", "notes": "Small team, so shifts are likely offered by phone or message. Many of their advertised roles are longer temp contracts, so say clearly you want part-time and holiday shifts."}, {"id": "s-wam", "name": "WAM Hospitality", "status": "To apply", "kind": "Event hospitality: waiting, bar, box staff, food runner, kitchen porter at venues and events", "payModel": "Indeed listings show about £14 to £15 an hour. Confirm PAYE.", "contact": "", "url": "https://uk.indeed.com/cmp/W.a.m.-Hospitality", "next": "Before accepting: confirm the hourly rate, whether travel is deducted from pay, and where the shifts are", "notes": "Appears to be south-coast based (Goodwood, Portsmouth, Southampton events) with some London work, so check travel time and cost. Reviews are mixed: several praise the flexibility for students; one from Oct 2025 says a travel charge was deducted after the job was accepted."}]};
+function cacheLocal(){try{localStorage.setItem(LS,JSON.stringify(state));saveErr="";}catch(e){saveErr="Could not save. Storage on this device is full or blocked. Export a backup from Planner now.";}}
+function loadLocal(){try{const r=localStorage.getItem(LS);if(r){state=normalize(JSON.parse(r));return true;}}catch(e){}return false;}
+function commit(){cacheLocal();render();}
+function renderStatus(){
+  const el=$("#status");el.className="status"+(saveErr?" err":"");
+  el.textContent=saveErr||note||(navigator.onLine===false?"Offline. Saved on this device.":"Saved on this device. Works offline.");
+}
+function exportBackup(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download="shift-planner-backup-"+todayISO()+".json";document.body.appendChild(a);a.click();a.remove();
+  try{localStorage.setItem(LS+"-backup-at",todayISO());}catch(e){}
+  toast("Backup file saved. Keep it in Files or iCloud.");render();
+}
+function importBackup(file){
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);if(!d||!Array.isArray(d.shifts))throw 0;undoState=JSON.stringify(state);state=normalize(d);commit();toast("Backup restored.",true);}catch(e){toast("That file is not a planner backup.");}};
+  r.readAsText(file);
+}
+function boot(){
+  window.addEventListener("hashchange",route);
+  window.addEventListener("online",renderStatus);window.addEventListener("offline",renderStatus);
+  if(!loadLocal()){state=normalize(SEED);cacheLocal();}
+  loaded=true;route();
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+/* ---------- shared pieces ---------- */
+function bar(t,cap,big){
+  const scale=Math.max(cap==null?40:cap,t.total,1);
+  const seg=(h,c)=>h>0?'<i class="seg '+c+'" style="width:'+(h/scale*100)+'%"></i>':"";
+  const over=cap!=null&&t.total>cap+1e-6?'<i class="over" style="left:'+(cap/scale*100)+'%;width:'+((t.total-cap)/scale*100)+'%"></i><b class="capline" style="left:'+(cap/scale*100)+'%"></b>':"";
+  return '<div class="bar'+(big?" big":"")+'" style="--u:'+(100/scale)+'%" role="img" aria-label="'+fmtH(t.total)+' hours'+(cap!=null?" of "+cap:"")+'">'+seg(t.worked,"w")+seg(t.booked,"b")+seg(t.considering,"c")+over+"</div>";
+}
+function weekPill(w,t){
+  if(w.away===7)return '<span class="pill dash">Away</span>';
+  if(w.cap==null)return '<span class="pill ok">Vacation · no cap</span>';
+  const committed=t.worked+t.booked;
+  if(committed>w.cap+1e-6)return '<span class="pill bad">Over by '+fmtH(committed-w.cap)+'h</span>';
+  if(t.total>w.cap+1e-6)return '<span class="pill warn">Over if you take all</span>';
+  if(Math.abs(t.total-w.cap)<1e-6)return '<span class="pill warn">At the cap</span>';
+  return '<span class="pill ok">'+fmtH(w.cap-t.total)+'h left</span>';
+}
+const kindLabel=w=>w.kind==="vacation"?"Vacation week":w.kind==="mixed"?"Part term, part vacation (treated as term)":"Term time";
+function statusPill(st){return '<span class="pill '+({worked:"ink",booked:"accent",considering:"dash",cancelled:""}[st]||"")+'">'+esc(STATUS[st]||st)+"</span>";}
+function shiftRow(s,tot){
+  const fl=shiftFlags(s,state.shifts,tot);
+  return '<button class="row '+esc(s.status)+'" data-act="edit-shift" data-id="'+esc(s.id)+'">'+
+    '<span class="when">'+esc(dShort(s.date))+"<br>"+esc(s.start||"")+"–"+esc(s.end||"")+"</span>"+
+    '<span class="what"><b>'+esc(s.role||"Shift")+(s.venue?" · "+esc(s.venue):"")+"</b>"+
+    '<span class="small muted">'+esc(srcName(s.sourceId)||"No agency")+" · "+fmtH(paidHours(s))+"h"+(s.rate?" at £"+Number(s.rate).toFixed(2):"")+"</span>"+
+    '<span class="flags">'+statusPill(s.status)+fl.map(f=>'<span class="pill '+f.lv+'">'+esc(f.text)+"</span>").join("")+"</span></span>"+
+    '<span class="amt">'+(s.rate?money(shiftPay(s)):"—")+"</span></button>";
+}
+const emptyBox=(text,act,label)=>'<div class="empty">'+esc(text)+(act?'<div style="margin-top:10px"><button class="btn" data-act="'+act+'">'+esc(label)+"</button></div>":"")+"</div>";
+
+/* ---------- views ---------- */
+function vDashboard(){
+  const today=todayISO(),mon=monday(today),tot=weekTotals(state.shifts);
+  const w=weekInfo(mon),t=tot.get(mon)||zero(),next=addDays(mon,7),w2=weekInfo(next),t2=tot.get(next)||zero();
+  // alerts
+  const alerts=[];
+  for(let i=0;i<16;i++){const k=addDays(mon,i*7),wi=weekInfo(k),ti=tot.get(k);if(!ti||wi.cap==null)continue;
+    const committed=ti.worked+ti.booked;
+    if(committed>wi.cap+1e-6)alerts.push({lv:"bad",text:"Week of "+wk(k)+": "+fmtH(committed)+"h booked or worked. That is "+fmtH(committed-wi.cap)+"h over the "+wi.cap+"h term-time cap. Drop or move a shift."});
+    else if(ti.total>wi.cap+1e-6)alerts.push({lv:"warn",text:"Week of "+wk(k)+": taking every shift you are considering would make "+fmtH(ti.total)+"h. Keep it to "+wi.cap+"h."});
+  }
+  const upcoming=state.shifts.filter(s=>s.status!=="cancelled"&&s.date>=today).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
+  for(const s of upcoming){for(const f of shiftFlags(s,state.shifts,tot)){if(f.text.startsWith("Week of"))continue;alerts.push({lv:f.lv,text:dShort(s.date)+" "+s.start+"–"+s.end+" ("+(s.role||"shift")+"): "+f.text});}}
+  const unconfirmed=state.shifts.filter(s=>s.status==="booked"&&s.date<today);
+  if(unconfirmed.length)alerts.push({lv:"info",text:unconfirmed.length+" past shift"+(unconfirmed.length>1?"s are":" is")+" still marked Booked. Open "+(unconfirmed.length>1?"them":"it")+" and mark Worked or Cancelled so your pay is right."});
+  // money
+  const ym=today.slice(0,7),inMonth=state.shifts.filter(s=>s.date&&s.date.slice(0,7)===ym);
+  const earned=inMonth.filter(s=>s.status==="worked").reduce((a,s)=>a+shiftPay(s),0);
+  const booked=inMonth.filter(s=>s.status==="booked").reduce((a,s)=>a+shiftPay(s),0);
+  const b=budgetFor(ym);
+  // away
+  const aways=state.periods.filter(p=>p.type==="away"&&p.to>=today).sort((a,b)=>a.from.localeCompare(b.from));
+  const scaleMax=w.cap==null?Math.max(40,t.total):Math.max(w.cap,t.total);
+  let h='<section class="card"><div class="card-h"><h2>This week · '+esc(wk(mon))+'</h2><span class="small muted">'+esc(kindLabel(w))+(w.cap!=null?" · cap "+w.cap+"h Monday to Sunday":"")+"</span></div>"+
+    '<div class="week-hero"><div><div class="bignum">'+fmtH(t.total)+(w.cap!=null?" <small>/ "+w.cap+"h</small>":" <small>h</small>")+"</div><div style=\"margin-top:8px\">"+weekPill(w,t)+"</div></div>"+
+    "<div>"+bar(t,w.cap,true)+'<div class="scale"><span>0</span><span>'+fmtH(scaleMax/2)+"</span><span>"+fmtH(scaleMax)+"h</span></div></div></div>"+
+    '<div class="legend"><span><i style="background:var(--ink)"></i>Worked '+fmtH(t.worked)+'h</span><span><i style="background:var(--accent)"></i>Booked '+fmtH(t.booked)+'h</span><span><i style="background:repeating-linear-gradient(135deg,var(--accent) 0 3px,transparent 3px 7px)"></i>Considering '+fmtH(t.considering)+"h</span><span>Pay this week "+money(t.pay)+"</span></div>"+
+    '<div class="mini"><span>Next week</span>'+bar(t2,w2.cap)+'<span class="num">'+fmtH(t2.total)+(w2.cap!=null?"/"+w2.cap:"")+"h</span></div></section>";
+  h+='<section class="card"><h2>Needs attention</h2>'+(alerts.length?alerts.map(a=>'<div class="alert '+a.lv+'">'+esc(a.text)+"</div>").join(""):'<div class="alert ok">Nothing clashes. Every week is inside its limit.</div>')+"</section>";
+  h+='<div class="grid"><section class="card"><div class="card-h"><h2>Next shifts</h2><a href="#shifts" class="small">All shifts</a></div>'+
+    (upcoming.length?'<div class="rows">'+upcoming.slice(0,5).map(s=>shiftRow(s,tot)).join("")+"</div>":emptyBox("No shifts yet. Add one you are booked on or just considering, and the planner checks it against your limit and classes.","add-shift","+ Add shift"))+"</section>"+
+    '<section class="card"><div class="card-h"><h2>Money · '+esc(fmtD(ym+"-01",{month:"long"}))+'</h2><a href="#budget" class="small">Budget</a></div>'+
+    '<div class="tiles"><div class="tile"><span class="small muted">Earned</span><div class="v">'+money(earned)+'</div></div><div class="tile"><span class="small muted">Booked to come</span><div class="v">'+money(booked)+'</div></div><div class="tile"><span class="small muted">Left after costs</span><div class="v '+(b.left<0?"neg":"pos")+'">'+money(b.left)+"</div></div></div>"+
+    '<p class="small muted">Pay is before tax. Left after costs uses your budget for this month.</p></section></div>';
+  // weeks ahead
+  let rows="";for(let i=0;i<8;i++){const k=addDays(mon,i*7),wi=weekInfo(k),ti=tot.get(k)||zero();
+    rows+='<div class="mini"><span>'+esc(dDM(k))+(wi.away?" ✈":"")+"</span>"+bar(ti,wi.cap)+'<span class="num">'+fmtH(ti.total)+(wi.cap!=null?"/"+wi.cap:"")+"h</span></div>";}
+  h+='<div class="grid"><section class="card"><div class="card-h"><h2>Next 8 weeks</h2><a href="#planner" class="small">Planner</a></div>'+rows+'<p class="small muted">Weeks start on Monday. A vacation week has no cap, so its strip runs to 40h.</p></section>'+
+    '<section class="card"><div class="card-h"><h2>Time away</h2><button class="btn sm" data-act="add-period" data-type="away">+ Add dates</button></div>'+
+    (aways.length?aways.map(p=>{const clash=state.shifts.filter(s=>s.status!=="cancelled"&&s.date>=p.from&&s.date<=p.to).length;
+      return '<div class="alert '+(clash?"bad":"info")+'"><div><b>'+esc(p.label||"Away")+"</b> · "+esc(dShort(p.from))+" to "+esc(dShort(p.to))+"<br><span class=\"small\">"+(clash?clash+" shift"+(clash>1?"s":"")+" booked inside these dates.":"No shifts inside these dates.")+"</span></div></div>";}).join("")
+      :emptyBox("Add the week at your uncle's. Any shift inside those dates gets flagged before you accept it.","",""))+
+    '<h3 style="margin-top:4px">Agencies</h3><div class="chips">'+(state.sources.length?state.sources.map(s=>'<a class="pill" href="#agencies" style="text-decoration:none;color:inherit">'+esc(s.name)+" · "+esc(s.status||"To apply")+"</a>").join(""):'<span class="small muted">None added yet.</span>')+"</div></section></div>";
+  return h;
+}
+
+function vShifts(){
+  const today=todayISO(),tot=weekTotals(state.shifts);
+  let list=state.shifts.slice();
+  if(shiftFilter==="upcoming")list=list.filter(s=>s.date>=monday(today));
+  if(shiftFilter==="past")list=list.filter(s=>s.date<today);
+  list.sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));if(shiftFilter==="past")list.reverse();
+  const groups=new Map();for(const s of list){const k=monday(s.date);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(s);}
+  let h='<section class="card"><div class="card-h"><h2>Shifts</h2><div class="chips">'+[["upcoming","This week onward"],["past","Past"],["all","All"]].map(([k,l])=>'<button class="chip" data-act="filter" data-f="'+k+'" aria-pressed="'+(shiftFilter===k)+'">'+l+"</button>").join("")+"</div></div>";
+  if(!list.length)h+=emptyBox("Nothing here yet.","add-shift","+ Add shift");
+  for(const[k,arr]of groups){const w=weekInfo(k),t=tot.get(k)||zero();
+    h+='<div><div class="wk-head"><h3>Week of '+esc(wk(k))+'</h3><span class="small"><span class="num">'+fmtH(t.total)+(w.cap!=null?" / "+w.cap:"")+"h · "+money(t.pay)+"</span> "+weekPill(w,t)+'</span></div><div class="rows">'+arr.map(s=>shiftRow(s,tot)).join("")+"</div></div>";}
+  return h+"</section>";
+}
+
+function vPlanner(){
+  const mon=monday(todayISO()),tot=weekTotals(state.shifts);let rows="";
+  for(let i=0;i<30;i++){const k=addDays(mon,i*7),w=weekInfo(k),t=tot.get(k)||zero();
+    rows+='<tr class="'+(i===0?"now":"")+'"><td>'+esc(wk(k))+"</td><td>"+(w.kind==="vacation"?"Vacation":w.kind==="mixed"?"Part term":"Term")+(w.away?' <span class="pill dash">Away '+w.away+"d</span>":"")+'</td><td style="min-width:150px">'+bar(t,w.cap)+'</td><td class="n">'+fmtH(t.total)+(w.cap!=null?" / "+w.cap:"")+'</td><td class="n">'+money(t.pay)+"</td><td>"+weekPill(w,t)+'</td><td><button class="btn sm" data-act="add-shift" data-date="'+k+'">+ Shift</button></td></tr>';}
+  const per=state.periods.slice().sort((a,b)=>a.from.localeCompare(b.from));
+  return '<section class="card"><div class="card-h"><h2>Vacations and time away</h2><div class="chips"><button class="btn sm" data-act="add-period" data-type="vacation">+ Vacation</button><button class="btn sm" data-act="add-period" data-type="away">+ Time away</button></div></div>'+
+    (per.length?'<div class="rows">'+per.map(p=>'<button class="row" data-act="edit-period" data-id="'+esc(p.id)+'"><span class="when">'+(p.type==="away"?"Away":"Vacation")+'</span><span class="what"><b>'+esc(p.label||(p.type==="away"?"Time away":"Vacation"))+'</b><span class="small muted">'+esc(dShort(p.from))+" to "+esc(dShort(p.to))+'</span></span><span class="amt small">Edit</span></button>').join("")+"</div>":emptyBox("No vacation dates yet. Without them every week is treated as term time with the cap on.","",""))+
+    '<p class="small muted">A week only loses its cap when all seven days, Monday to Sunday, sit inside a vacation. Check the dates against your university\'s official term dates.</p></section>'+
+    '<section class="card"><h2>Next 30 weeks</h2><div class="tbl-wrap"><table><thead><tr><th>Week</th><th>Type</th><th>Hours</th><th class="n">Total</th><th class="n">Pay</th><th>Status</th><th></th></tr></thead><tbody>'+rows+"</tbody></table></div></section>"+
+    '<section class="card"><div class="card-h"><h2>Backup</h2><div class="chips"><button class="btn sm" data-act="export">Save a backup file</button><label class="btn sm" style="flex-direction:row;color:inherit;cursor:pointer">Restore from file<input type="file" id="imp" accept="application/json,.json" style="display:none"></label></div></div>'+
+    '<p class="small">Your data lives only on this device, inside this app. It stays through restarts and updates. It is lost if you delete the app from your home screen or clear Safari website data, so save a backup file now and then.'+(()=>{let d="";try{d=localStorage.getItem(LS+"-backup-at")||"";}catch(e){}return d?" Last backup: "+esc(dShort(d))+".":" No backup saved yet.";})()+'</p></section>'+
+    '<section class="card"><div class="card-h"><h2>What this planner checks</h2><button class="btn sm" data-act="settings">Settings</button></div><ul class="plain">'+
+    "<li>Weekly cap of "+esc(state.settings.cap)+"h in term time, counted Monday to Sunday across every job together. Hours cannot be averaged between weeks.</li>"+
+    "<li>Shifts you are only considering count toward the total, so you see the effect before you accept.</li>"+
+    "<li>Overnight shifts are split at midnight, so Sunday night into Monday lands in two different weeks.</li>"+
+    "<li>Unpaid breaks are "+(state.settings.countBreaks?"counted":"not counted")+" toward the cap. Change this in Settings if you want the stricter count.</li>"+
+    "<li>Clashes with your classes, your time away and other shifts.</li>"+
+    "<li>It does not check the type of work. On a Student visa the work must be employed (PAYE), not self-employed or freelance.</li></ul>"+
+    '<p class="small muted">This is a planning aid, not immigration advice. Your university\'s international student advice team can confirm your exact conditions and vacation dates.</p></section>';
+}
+
+function vTimetable(){
+  let h='<section class="card"><div class="card-h"><h2>Class timetable</h2><button class="btn sm" data-act="add-class">+ Add class</button></div>';
+  if(!state.classes.length)h+=emptyBox("Add your lectures, seminars and labs. A shift that overlaps one in term time gets flagged.","add-class","+ Add class");
+  else for(let d=0;d<7;d++){const cs=state.classes.filter(c=>Number(c.day)===d).sort((a,b)=>a.start.localeCompare(b.start));if(!cs.length)continue;
+    h+='<div><div class="wk-head"><h3>'+DAYS[d]+'</h3></div><div class="rows">'+cs.map(c=>'<button class="row" data-act="edit-class" data-id="'+esc(c.id)+'"><span class="when">'+esc(c.start)+"–"+esc(c.end)+'</span><span class="what"><b>'+esc(c.title||"Class")+'</b><span class="small muted">'+esc(c.room||"")+'</span></span><span class="amt small">Edit</span></button>').join("")+"</div></div>";}
+  return h+'<p class="small muted">Classes are ignored on vacation days. Add travel time by making the class a little longer.</p></section>';
+}
+
+function roleStats(){
+  const m=new Map();
+  for(const s of state.shifts){if(s.status==="cancelled"||s.status==="considering")continue;
+    const k=(s.role||"Unnamed role")+"|"+(s.sourceId||"");const r=m.get(k)||{role:s.role||"Unnamed role",src:srcName(s.sourceId),n:0,h:0,pay:0};
+    r.n++;r.h+=paidHours(s);r.pay+=shiftPay(s);m.set(k,r);}
+  return [...m.values()].sort((a,b)=>b.pay-a.pay);
+}
+function vAgencies(){
+  let h='<section class="card"><div class="card-h"><h2>Agencies and applications</h2><button class="btn sm" data-act="add-source">+ Add agency</button></div>';
+  if(!state.sources.length)h+=emptyBox("Add each agency or app you have applied to.","add-source","+ Add agency");
+  h+='<div class="grid">'+state.sources.map(s=>{
+    const mine=state.shifts.filter(x=>x.sourceId===s.id&&(x.status==="worked"||x.status==="booked"));
+    const hrs=mine.reduce((a,x)=>a+paidHours(x),0),pay=mine.reduce((a,x)=>a+shiftPay(x),0);
+    return '<article class="card" style="background:var(--bg)"><div class="card-h"><h3 style="font-size:16px">'+esc(s.name)+'</h3><button class="btn sm" data-act="edit-source" data-id="'+esc(s.id)+'">Edit</button></div>'+
+      '<label>Application status<select data-change="src-status" data-id="'+esc(s.id)+'" id="st-'+esc(s.id)+'">'+SRC_STATUS.map(o=>"<option"+(o===(s.status||"To apply")?" selected":"")+">"+o+"</option>").join("")+"</select></label>"+
+      '<dl class="kv">'+(s.kind?"<dt>Work</dt><dd>"+esc(s.kind)+"</dd>":"")+(s.payModel?"<dt>Pay</dt><dd>"+esc(s.payModel)+"</dd>":"")+(s.contact?"<dt>Contact</dt><dd>"+esc(s.contact)+"</dd>":"")+(s.url?'<dt>Site</dt><dd><a href="'+esc(s.url)+'" target="_blank" rel="noopener">'+esc(s.url.replace(/^https?:\/\//,""))+"</a></dd>":"")+(s.next?"<dt>Next step</dt><dd><b>"+esc(s.next)+"</b></dd>":"")+"</dl>"+
+      (s.notes?'<p class="small">'+esc(s.notes)+"</p>":"")+
+      '<p class="small muted num">'+mine.length+" shift"+(mine.length===1?"":"s")+" · "+fmtH(hrs)+"h · "+money(pay)+"</p></article>";}).join("")+"</div></section>";
+  const rs=roleStats();
+  h+='<section class="card"><h2>Pay by role</h2>'+(rs.length?'<div class="tbl-wrap"><table><thead><tr><th>Role</th><th>Agency</th><th class="n">Shifts</th><th class="n">Hours</th><th class="n">Avg £/h</th><th class="n">Pay</th></tr></thead><tbody>'+rs.map(r=>"<tr><td>"+esc(r.role)+"</td><td>"+esc(r.src||"—")+'</td><td class="n">'+r.n+'</td><td class="n">'+fmtH(r.h)+'</td><td class="n">'+(r.h?money(r.pay/r.h):"—")+'</td><td class="n">'+money(r.pay)+"</td></tr>").join("")+"</tbody></table></div>":emptyBox("Once you log booked or worked shifts with a role and hourly rate, this compares what each role pays.","",""))+"</section>";
+  return h;
+}
+
+function budgetFor(ym){
+  const sh=state.shifts.filter(s=>s.date&&s.date.slice(0,7)===ym);
+  const earned=sh.filter(s=>s.status==="worked").reduce((a,s)=>a+shiftPay(s),0),booked=sh.filter(s=>s.status==="booked").reduce((a,s)=>a+shiftPay(s),0);
+  const amt=i=>i.freq==="weekly"?Number(i.amount||0)*52/12:i.freq==="once"?(i.month===ym?Number(i.amount||0):0):Number(i.amount||0);
+  const items=state.budget.items.map(i=>Object.assign({},i,{m:amt(i)})).filter(i=>i.freq!=="once"||i.month===ym);
+  const other=items.filter(i=>i.kind==="income").reduce((a,i)=>a+i.m,0),costs=items.filter(i=>i.kind!=="income").reduce((a,i)=>a+i.m,0);
+  return {earned,booked,other,costs,items,income:earned+booked+other,left:earned+booked+other-costs};
+}
+function avgRate(){let h=0,p=0;for(const s of state.shifts){if(s.status==="cancelled"||!s.rate)continue;h+=paidHours(s);p+=shiftPay(s);}return h?p/h:0;}
+function vBudget(){
+  const ym=budgetMonth,b=budgetFor(ym),r=avgRate(),cap=Number(state.settings.cap)||20;
+  const shift=n=>{const d=D(ym+"-01");d.setUTCMonth(d.getUTCMonth()+n);return iso(d).slice(0,7);};
+  let h='<section class="card"><div class="card-h"><h2>Budget · '+esc(fmtD(ym+"-01",{month:"long",year:"numeric"}))+'</h2><div class="chips"><button class="btn sm" data-act="month" data-m="'+shift(-1)+'">← Earlier</button><button class="btn sm" data-act="month" data-m="'+shift(1)+'">Later →</button></div></div>'+
+    '<div class="tiles"><div class="tile"><span class="small muted">Shift pay earned</span><div class="v">'+money(b.earned)+'</div></div><div class="tile"><span class="small muted">Shift pay booked</span><div class="v">'+money(b.booked)+'</div></div><div class="tile"><span class="small muted">Other income</span><div class="v">'+money(b.other)+'</div></div><div class="tile"><span class="small muted">Costs</span><div class="v">'+money(b.costs)+'</div></div><div class="tile"><span class="small muted">Left over</span><div class="v '+(b.left<0?"neg":"pos")+'">'+money(b.left)+"</div></div></div>";
+  const gap=b.costs-b.other;
+  if(b.costs>0){
+    if(r>0){const hw=gap>0?gap*12/52/r:0;
+      h+='<div class="alert '+(hw>cap?"warn":"info")+'">To cover these costs from shifts you need about <b>&nbsp;'+fmtH(Math.ceil(hw*2)/2)+"h a week&nbsp;</b> at your average of "+money(r)+" an hour."+(hw>cap?" That is more than the "+cap+"h term-time cap allows, so plan to earn the difference in vacation weeks or trim a cost.":"")+"</div>";}
+    else h+='<div class="alert info">Add a shift with an hourly rate and this will show how many hours a week cover your costs.</div>';
+  }
+  const list=(kind,title)=>{const it=b.items.filter(i=>(i.kind==="income")===(kind==="income"));
+    return '<section class="card"><div class="card-h"><h2>'+title+'</h2><button class="btn sm" data-act="add-item" data-kind="'+kind+'">+ Add</button></div>'+
+      (it.length?'<div class="rows">'+it.map(i=>'<button class="row" data-act="edit-item" data-id="'+esc(i.id)+'"><span class="when">'+({weekly:"Weekly",once:"One-off",monthly:"Monthly"}[i.freq]||"Monthly")+'</span><span class="what"><b>'+esc(i.name)+'</b><span class="small muted">'+money(Number(i.amount||0))+(i.freq==="weekly"?" a week":i.freq==="once"?" once":" a month")+'</span></span><span class="amt">'+money(i.m)+"</span></button>").join("")+"</div>"
+        :(kind==="cost"?'<div class="chips">'+["Rent","Food","Transport","Phone","Going out","Trip to my uncle's"].map(n=>'<button class="chip" data-act="add-item" data-kind="cost" data-name="'+esc(n)+'">+ '+esc(n)+"</button>").join("")+"</div>":emptyBox("Anything besides shift pay, such as money from family or a bursary.","","")))+"</section>";};
+  h+="</section>"+'<div class="grid">'+list("cost","Costs")+list("income","Other income")+"</div>";
+  const g=state.budget.goal;
+  h+='<section class="card"><div class="card-h"><h2>Savings goal</h2><button class="btn sm" data-act="goal">'+(g?"Edit":"+ Set a goal")+"</button></div>";
+  if(g&&g.amount){const today=todayISO(),left=Math.max(0,Number(g.amount)-Number(g.saved||0)),weeks=g.by&&g.by>today?Math.max(1,Math.ceil((D(g.by)-D(today))/6048e5)):0;
+    const tg={worked:Number(g.saved||0),booked:0,considering:0,total:Number(g.saved||0)};
+    h+="<p><b>"+esc(g.name||"Goal")+'</b> · <span class="num">'+money(Number(g.saved||0))+" of "+money(Number(g.amount))+"</span>"+(g.by?" by "+esc(dShort(g.by)):"")+"</p>"+
+      '<div class="bar" style="--u:10%"><i class="seg w" style="width:'+Math.min(100,Number(g.saved||0)/Number(g.amount)*100)+'%"></i></div>'+
+      (weeks?'<p class="small">'+money(left/weeks)+" a week for "+weeks+" weeks"+(r?", about "+fmtH(Math.ceil(left/weeks/r*2)/2)+"h of work a week on top of your costs":"")+".</p>":"");
+  }else h+=emptyBox("Set an amount and a date, and the planner works out what to put aside each week.","","");
+  return h+'</section><p class="small muted">All pay figures are before tax and deductions. One-off items only appear in their own month.</p>';
+}
+
+/* ---------- forms ---------- */
+let F=null;
+const dlg=$("#dlg");
+function openForm(cfg){
+  F=cfg;
+  const field=f=>{
+    const id="f-"+f.k,v=cfg.values[f.k]??"";let c;
+    if(f.type==="select")c='<select id="'+id+'" name="'+f.k+'">'+f.opts.map(([val,l])=>'<option value="'+esc(val)+'"'+(String(val)===String(v)?" selected":"")+">"+esc(l)+"</option>").join("")+"</select>";
+    else if(f.type==="textarea")c='<textarea id="'+id+'" name="'+f.k+'">'+esc(v)+"</textarea>";
+    else c='<input id="'+id+'" name="'+f.k+'" type="'+(f.type||"text")+'" value="'+esc(v)+'"'+(f.step?' step="'+f.step+'"':"")+(f.min!=null?' min="'+f.min+'"':"")+(f.req?" required":"")+(f.ph?' placeholder="'+esc(f.ph)+'"':"")+(f.list?' list="'+id+'-l"':"")+(f.type==="number"?' inputmode="decimal"':"")+">"+(f.list?'<datalist id="'+id+'-l">'+f.list.map(o=>'<option value="'+esc(o)+'">').join("")+"</datalist>":"");
+    return '<label class="'+(f.full?"full":"")+'">'+esc(f.label)+c+"</label>";
+  };
+  dlg.innerHTML='<form id="frm"><h2>'+esc(cfg.title)+'</h2><div class="fgrid">'+cfg.fields.map(field).join("")+'</div><div id="preview"></div><div class="actions">'+
+    (cfg.del?'<button type="button" class="btn danger left" data-act="form-del">Delete</button>':"")+
+    '<button type="button" class="btn ghost" data-act="form-close">Cancel</button>'+(cfg.again?'<button type="submit" class="btn" name="again" value="1">Save and add another</button>':"")+'<button type="submit" class="btn primary">Save</button></div></form>';
+  try{dlg.showModal();}catch(e){dlg.setAttribute("open","");}
+  if(cfg.preview)$("#preview").innerHTML=cfg.preview(vals());
+}
+function vals(){const o={},f=$("#frm");for(const x of F.fields)o[x.k]=f.elements[x.k].value.trim();return o;}
+function closeForm(){try{dlg.close();}catch(e){dlg.removeAttribute("open");}F=null;}
+dlg.addEventListener("input",e=>{if(!F)return;if(F.onInput)F.onInput(e.target.name,$("#frm"));if(F.preview)$("#preview").innerHTML=F.preview(vals());});
+dlg.addEventListener("submit",e=>{e.preventDefault();if(!F)return;const v=vals(),again=e.submitter&&e.submitter.name==="again",cfg=F;
+  const err=cfg.validate&&cfg.validate(v);if(err){$("#preview").innerHTML='<div class="alert bad">'+esc(err)+"</div>";return;}
+  cfg.save(v);closeForm();commit();if(again&&cfg.again)cfg.again(v);});
+
+function shiftForm(id,preset){
+  const ex=id?state.shifts.find(s=>s.id===id):null;
+  const last=state.shifts[state.shifts.length-1];
+  const values=ex?Object.assign({},ex):Object.assign({date:todayISO(),start:"",end:"",breakMin:"0",sourceId:last?last.sourceId:(state.sources[0]?state.sources[0].id:""),role:"",venue:"",rate:"",status:"booked",notes:""},preset||{});
+  const roles=[...new Set(state.shifts.map(s=>s.role).filter(Boolean))];
+  let autoRate=!values.rate;
+  const temp=v=>Object.assign({id:id||"__new"},v);
+  openForm({title:ex?"Edit shift":"Add shift",values,del:ex?()=>{state.shifts=state.shifts.filter(s=>s.id!==id);}:null,
+    fields:[{k:"date",label:"Date",type:"date",req:1},{k:"status",label:"Status",type:"select",opts:Object.entries(STATUS)},
+      {k:"start",label:"Starts",type:"time",req:1},{k:"end",label:"Ends",type:"time",req:1},
+      {k:"sourceId",label:"Agency",type:"select",opts:[["","No agency"]].concat(state.sources.map(s=>[s.id,s.name]))},{k:"role",label:"Role",list:roles,ph:"Waiter, bar, warehouse…"},
+      {k:"rate",label:"Pay per hour (£)",type:"number",step:"0.01",min:0},{k:"breakMin",label:"Unpaid break (minutes)",type:"number",step:"5",min:0},
+      {k:"venue",label:"Venue or client",full:1},{k:"notes",label:"Notes",type:"textarea",full:1}],
+    onInput:(name,f)=>{
+      if(name==="rate"){autoRate=false;return;}
+      if((name==="role"||name==="sourceId")&&autoRate){
+        const role=f.elements.role.value.trim().toLowerCase(),src=f.elements.sourceId.value;
+        const m=state.shifts.filter(s=>s.rate&&s.id!==id&&(s.role||"").toLowerCase()===role&&role).sort((a,b)=>(b.sourceId===src)-(a.sourceId===src)||b.date.localeCompare(a.date))[0];
+        if(m)f.elements.rate.value=m.rate;
+      }},
+    preview:v=>{
+      if(!v.date||!v.start||!v.end)return '<div class="alert info">Enter the date and times to see how this fits your week.</div>';
+      const s=temp(v),others=state.shifts.filter(x=>x.id!==s.id).concat([s]),tot=weekTotals(others),fl=shiftFlags(s,others,tot);
+      const k=monday(v.date),w=weekInfo(k),t=tot.get(k)||zero();
+      return '<div class="tiles"><div class="tile"><span class="small muted">Hours counted</span><div class="v">'+fmtH(capHours(s))+'h</div></div><div class="tile"><span class="small muted">Pay</span><div class="v">'+(v.rate?money(shiftPay(s)):"—")+'</div></div></div>'+
+        '<div class="mini"><span>Week '+esc(dDM(k))+"</span>"+bar(t,w.cap)+'<span class="num">'+fmtH(t.total)+(w.cap!=null?"/"+w.cap:"")+"h</span></div>"+
+        (v.status==="cancelled"?"":fl.length?fl.map(f=>'<div class="alert '+f.lv+'">'+esc(f.text)+"</div>").join(""):'<div class="alert ok">Fits. '+(w.cap!=null?fmtH(w.cap-t.total)+"h still free that week.":"Vacation week, no cap.")+"</div>");
+    },
+    validate:v=>v.start===v.end?"Start and end time are the same.":"",
+    save:v=>{if(ex)Object.assign(ex,v);else state.shifts.push(Object.assign({id:uid()},v));},
+    again:v=>shiftForm(null,{date:addDays(v.date,1),start:v.start,end:v.end,breakMin:v.breakMin,sourceId:v.sourceId,role:v.role,venue:v.venue,rate:v.rate,status:v.status})});
+}
+function simpleForm(title,list,id,defaults,fields,validate){
+  const ex=id?list().find(x=>x.id===id):null;
+  openForm({title:(ex?"Edit ":"Add ")+title,values:ex?Object.assign({},ex):defaults,fields,validate,
+    del:ex?()=>{const l=list();l.splice(l.indexOf(ex),1);}:null,
+    save:v=>{if(ex)Object.assign(ex,v);else list().push(Object.assign({id:uid()},defaults,v));}});
+}
+const classForm=id=>simpleForm("class",()=>state.classes,id,{title:"",day:"0",start:"",end:"",room:""},
+  [{k:"title",label:"Module or class",full:1,req:1,ph:"CST3310 lecture"},{k:"day",label:"Day",type:"select",opts:DAYS.map((d,i)=>[i,d])},{k:"room",label:"Room"},{k:"start",label:"Starts",type:"time",req:1},{k:"end",label:"Ends",type:"time",req:1}],
+  v=>v.end<=v.start?"The class must end after it starts.":"");
+const periodForm=(id,type)=>simpleForm(type==="away"?"time away":"vacation",()=>state.periods,id,{type:type||"vacation",label:type==="away"?"At my uncle's":"",from:"",to:""},
+  [{k:"type",label:"Type",type:"select",opts:[["vacation","University vacation (no cap)"],["away","Time away (no shifts)"]]},{k:"label",label:"Label"},{k:"from",label:"First day",type:"date",req:1},{k:"to",label:"Last day",type:"date",req:1}],
+  v=>v.to<v.from?"The last day is before the first day.":"");
+const sourceForm=id=>simpleForm("agency",()=>state.sources,id,{name:"",status:"To apply",kind:"",payModel:"",contact:"",url:"",next:"",notes:""},
+  [{k:"name",label:"Name",req:1},{k:"status",label:"Application status",type:"select",opts:SRC_STATUS.map(s=>[s,s])},{k:"kind",label:"Kind of work",full:1},{k:"payModel",label:"How you are paid",full:1,ph:"PAYE, weekly"},{k:"contact",label:"Contact",full:1},{k:"url",label:"Website",full:1},{k:"next",label:"Next step",full:1},{k:"notes",label:"Notes",type:"textarea",full:1}]);
+const itemForm=(id,kind,name)=>simpleForm(kind==="income"?"income":"cost",()=>state.budget.items,id,{kind:kind||"cost",name:name||"",amount:"",freq:"monthly",month:budgetMonth},
+  [{k:"name",label:"Name",req:1,full:1},{k:"amount",label:"Amount (£)",type:"number",step:"0.01",min:0,req:1},{k:"freq",label:"How often",type:"select",opts:[["monthly","Every month"],["weekly","Every week"],["once","One-off"]]},{k:"month",label:"Month (one-off only)",type:"month"},{k:"kind",label:"Type",type:"select",opts:[["cost","Cost"],["income","Income"]]}]);
+function goalForm(){const g=state.budget.goal;
+  openForm({title:"Savings goal",values:g||{name:"",amount:"",saved:"0",by:""},del:g?()=>{state.budget.goal=null;}:null,
+    fields:[{k:"name",label:"What for",full:1},{k:"amount",label:"Target (£)",type:"number",step:"0.01",min:0,req:1},{k:"saved",label:"Saved so far (£)",type:"number",step:"0.01",min:0},{k:"by",label:"By when",type:"date",full:1}],
+    save:v=>{state.budget.goal=v;}});}
+function settingsForm(){
+  openForm({title:"Settings",values:{cap:state.settings.cap,countBreaks:state.settings.countBreaks?"1":"0"},
+    fields:[{k:"cap",label:"Term-time weekly cap (hours)",type:"number",step:"1",min:1,req:1},{k:"countBreaks",label:"Unpaid breaks",type:"select",opts:[["0","Do not count toward the cap"],["1","Count toward the cap (stricter)"]]}],
+    save:v=>{state.settings.cap=Number(v.cap)||20;state.settings.countBreaks=v.countBreaks==="1";}});}
+
+/* ---------- events, routing, render ---------- */
+function toast(msg,undo){
+  clearTimeout(toastTimer);$("#toast").innerHTML='<div class="toast"><span>'+esc(msg)+"</span>"+(undo?'<button data-act="undo">Undo</button>':"")+"</div>";
+  toastTimer=setTimeout(()=>{$("#toast").innerHTML="";undoState=null;},7000);
+}
+document.addEventListener("click",e=>{
+  const el=e.target.closest("[data-act]");if(!el)return;const a=el.dataset.act,id=el.dataset.id;
+  if(a==="add-shift")shiftForm(null,el.dataset.date?{date:el.dataset.date}:null);
+  else if(a==="edit-shift")shiftForm(id);
+  else if(a==="filter"){shiftFilter=el.dataset.f;render();}
+  else if(a==="add-class")classForm();else if(a==="edit-class")classForm(id);
+  else if(a==="add-period")periodForm(null,el.dataset.type);else if(a==="edit-period")periodForm(id,(state.periods.find(p=>p.id===id)||{}).type);
+  else if(a==="add-source")sourceForm();else if(a==="edit-source")sourceForm(id);
+  else if(a==="add-item")itemForm(null,el.dataset.kind,el.dataset.name);else if(a==="edit-item")itemForm(id,(state.budget.items.find(i=>i.id===id)||{}).kind);
+  else if(a==="export")exportBackup();
+  else if(a==="goal")goalForm();else if(a==="settings")settingsForm();
+  else if(a==="month"){budgetMonth=el.dataset.m;render();}
+  else if(a==="form-close")closeForm();
+  else if(a==="form-del"&&F&&F.del){undoState=JSON.stringify(state);F.del();closeForm();commit();toast("Deleted.",true);}
+  else if(a==="undo"&&undoState){state=normalize(JSON.parse(undoState));undoState=null;$("#toast").innerHTML="";commit();}
+});
+document.addEventListener("change",e=>{
+  if(e.target.id==="imp"&&e.target.files[0]){importBackup(e.target.files[0]);return;}
+  const el=e.target.closest("[data-change]");if(!el)return;
+  if(el.dataset.change==="src-status"){const s=state.sources.find(x=>x.id===el.dataset.id);if(s){s.status=el.value;commit();}}
+});
+const VIEWS={dashboard:["Dashboard",vDashboard],shifts:["Shifts",vShifts],planner:["Planner",vPlanner],timetable:["Timetable",vTimetable],agencies:["Agencies",vAgencies],budget:["Budget",vBudget]};
+function route(){const h=location.hash.replace("#","");view=VIEWS[h]?h:"dashboard";render();window.scrollTo(0,0);}
+function render(){
+  $("#nav").innerHTML=Object.entries(VIEWS).map(([k,[l]])=>'<a href="#'+k+'"'+(k===view?' aria-current="page"':"")+">"+l+"</a>").join("");
+  renderStatus();
+  $("#main").innerHTML=loaded?VIEWS[view][1]():'<div class="empty">Loading your shifts…</div>';
+}
+boot();
+</script>
+</body>
+</html>
